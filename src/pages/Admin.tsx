@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Upload, Users, Download, FileText, Plus, Trash2, Eye, BarChart3,
-  Search, ChevronDown, X
+  Search, ChevronDown, X, CreditCard, Crown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,9 @@ const plans = ["starter", "pro", "master"] as const;
 
 const Admin = () => {
   const [files, setFiles] = useState<any[]>([]);
-  const [stats, setStats] = useState({ totalFiles: 0, totalUsers: 0, totalDownloads: 0 });
+  const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [stats, setStats] = useState({ totalFiles: 0, totalUsers: 0, totalDownloads: 0, totalSubscribers: 0 });
   const [loading, setLoading] = useState(true);
   const [uploadOpen, setUploadOpen] = useState(false);
 
@@ -47,16 +49,21 @@ const Admin = () => {
   }, []);
 
   const fetchData = async () => {
-    const [filesRes, profilesRes, downloadsRes] = await Promise.all([
+    const [filesRes, profilesRes, downloadsRes, subsRes, paymentsRes] = await Promise.all([
       supabase.from("creative_files").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("id", { count: "exact", head: true }),
       supabase.from("download_history").select("id", { count: "exact", head: true }),
+      supabase.from("subscriptions").select("*, profiles(full_name)").order("created_at", { ascending: false }),
+      supabase.from("payments").select("*, profiles(full_name)").order("created_at", { ascending: false }).limit(50),
     ]);
     if (filesRes.data) setFiles(filesRes.data);
+    if (subsRes.data) setSubscribers(subsRes.data);
+    if (paymentsRes.data) setPayments(paymentsRes.data);
     setStats({
       totalFiles: filesRes.data?.length ?? 0,
       totalUsers: profilesRes.count ?? 0,
       totalDownloads: downloadsRes.count ?? 0,
+      totalSubscribers: subsRes.data?.filter((s: any) => s.status === "active").length ?? 0,
     });
     setLoading(false);
   };
@@ -212,7 +219,7 @@ const Admin = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
               <div className="rounded-xl border border-border bg-gradient-card p-5 flex items-center gap-4">
                 <div className="p-3 rounded-lg bg-primary/10"><FileText className="w-5 h-5 text-primary" /></div>
                 <div>
@@ -234,61 +241,168 @@ const Admin = () => {
                   <p className="text-xs text-muted-foreground">Downloads</p>
                 </div>
               </div>
+              <div className="rounded-xl border border-border bg-gradient-card p-5 flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-primary/10"><Crown className="w-5 h-5 text-primary" /></div>
+                <div>
+                  <p className="text-2xl font-bold font-display">{stats.totalSubscribers}</p>
+                  <p className="text-xs text-muted-foreground">Assinantes ativos</p>
+                </div>
+              </div>
             </div>
 
-            {/* Files Table */}
-            <div className="rounded-xl border border-border bg-gradient-card overflow-hidden">
-              <div className="p-4 border-b border-border">
-                <h2 className="font-display font-semibold">Arquivos na Biblioteca</h2>
-              </div>
-              {loading ? (
-                <div className="flex justify-center py-12">
-                  <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <Tabs defaultValue="files" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="files">Arquivos</TabsTrigger>
+                <TabsTrigger value="subscribers">Assinantes</TabsTrigger>
+                <TabsTrigger value="payments">Pagamentos</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="files">
+                <div className="rounded-xl border border-border bg-gradient-card overflow-hidden">
+                  <div className="p-4 border-b border-border">
+                    <h2 className="font-display font-semibold">Arquivos na Biblioteca</h2>
+                  </div>
+                  {loading ? (
+                    <div className="flex justify-center py-12">
+                      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : files.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground text-sm">
+                      Nenhum arquivo enviado ainda.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Título</TableHead>
+                            <TableHead>Categoria</TableHead>
+                            <TableHead>Formato</TableHead>
+                            <TableHead>Plano</TableHead>
+                            <TableHead>Downloads</TableHead>
+                            <TableHead>Data</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {files.map((file) => (
+                            <TableRow key={file.id}>
+                              <TableCell className="font-medium max-w-[200px] truncate">{file.title}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{file.category}</TableCell>
+                              <TableCell><Badge variant="secondary" className="text-[10px]">{file.format}</Badge></TableCell>
+                              <TableCell><Badge variant="outline" className="text-[10px]">{planLabel[file.plan_required]}</Badge></TableCell>
+                              <TableCell className="text-sm">{file.downloads_count}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{new Date(file.created_at).toLocaleDateString("pt-BR")}</TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDelete(file.id, file.file_path, file.thumbnail_path)}
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </div>
-              ) : files.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground text-sm">
-                  Nenhum arquivo enviado ainda.
+              </TabsContent>
+
+              <TabsContent value="subscribers">
+                <div className="rounded-xl border border-border bg-gradient-card overflow-hidden">
+                  <div className="p-4 border-b border-border">
+                    <h2 className="font-display font-semibold">Assinantes</h2>
+                  </div>
+                  {subscribers.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground text-sm">Nenhum assinante.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Usuário</TableHead>
+                            <TableHead>Plano</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Downloads</TableHead>
+                            <TableHead>Período</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {subscribers.map((sub: any) => (
+                            <TableRow key={sub.id}>
+                              <TableCell className="text-sm">{(sub.profiles as any)?.full_name || sub.user_id.slice(0, 8)}</TableCell>
+                              <TableCell><Badge variant="outline" className="text-[10px]">{planLabel[sub.plan]}</Badge></TableCell>
+                              <TableCell>
+                                <Badge variant={sub.status === "active" ? "default" : "secondary"} className="text-[10px]">
+                                  {sub.status === "active" ? "Ativo" : sub.status === "cancelled" ? "Cancelado" : sub.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-sm">{sub.downloads_used}/{sub.downloads_limit}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {new Date(sub.current_period_end).toLocaleDateString("pt-BR")}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Título</TableHead>
-                        <TableHead>Categoria</TableHead>
-                        <TableHead>Formato</TableHead>
-                        <TableHead>Plano</TableHead>
-                        <TableHead>Downloads</TableHead>
-                        <TableHead>Data</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {files.map((file) => (
-                        <TableRow key={file.id}>
-                          <TableCell className="font-medium max-w-[200px] truncate">{file.title}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{file.category}</TableCell>
-                          <TableCell><Badge variant="secondary" className="text-[10px]">{file.format}</Badge></TableCell>
-                          <TableCell><Badge variant="outline" className="text-[10px]">{planLabel[file.plan_required]}</Badge></TableCell>
-                          <TableCell className="text-sm">{file.downloads_count}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{new Date(file.created_at).toLocaleDateString("pt-BR")}</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(file.id, file.file_path, file.thumbnail_path)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+              </TabsContent>
+
+              <TabsContent value="payments">
+                <div className="rounded-xl border border-border bg-gradient-card overflow-hidden">
+                  <div className="p-4 border-b border-border">
+                    <h2 className="font-display font-semibold">Histórico de Pagamentos</h2>
+                  </div>
+                  {payments.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground text-sm">Nenhum pagamento registrado.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Usuário</TableHead>
+                            <TableHead>Plano</TableHead>
+                            <TableHead>Valor</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Método</TableHead>
+                            <TableHead>Data</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {payments.map((p: any) => (
+                            <TableRow key={p.id}>
+                              <TableCell className="text-sm">{(p.profiles as any)?.full_name || p.user_id.slice(0, 8)}</TableCell>
+                              <TableCell><Badge variant="outline" className="text-[10px]">{planLabel[p.plan]}</Badge></TableCell>
+                              <TableCell className="text-sm">R$ {Number(p.amount).toFixed(2).replace(".", ",")}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={p.status === "approved" ? "default" : "secondary"}
+                                  className="text-[10px]"
+                                >
+                                  {p.status === "approved" ? "Aprovado" : p.status === "pending" ? "Pendente" : p.status === "rejected" ? "Recusado" : p.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {p.payment_method === "credit_card" ? "Cartão" : p.payment_method === "pix" ? "PIX" : p.payment_method || "—"}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {new Date(p.created_at).toLocaleDateString("pt-BR")}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </TabsContent>
+            </Tabs>
           </motion.div>
         </div>
       </section>
