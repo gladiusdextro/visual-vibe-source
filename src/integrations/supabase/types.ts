@@ -14,16 +14,196 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      creative_files: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          downloads_count: number
+          file_path: string
+          file_size_bytes: number | null
+          format: Database["public"]["Enums"]["file_format"]
+          id: string
+          is_active: boolean
+          plan_required: Database["public"]["Enums"]["subscription_plan"]
+          tags: string[] | null
+          thumbnail_path: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          downloads_count?: number
+          file_path: string
+          file_size_bytes?: number | null
+          format: Database["public"]["Enums"]["file_format"]
+          id?: string
+          is_active?: boolean
+          plan_required?: Database["public"]["Enums"]["subscription_plan"]
+          tags?: string[] | null
+          thumbnail_path?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          downloads_count?: number
+          file_path?: string
+          file_size_bytes?: number | null
+          format?: Database["public"]["Enums"]["file_format"]
+          id?: string
+          is_active?: boolean
+          plan_required?: Database["public"]["Enums"]["subscription_plan"]
+          tags?: string[] | null
+          thumbnail_path?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      download_history: {
+        Row: {
+          downloaded_at: string
+          file_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          downloaded_at?: string
+          file_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          downloaded_at?: string
+          file_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "download_history_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "creative_files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          downloads_limit: number
+          downloads_used: number
+          id: string
+          plan: Database["public"]["Enums"]["subscription_plan"]
+          status: Database["public"]["Enums"]["subscription_status"]
+          stripe_subscription_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          downloads_limit?: number
+          downloads_used?: number
+          id?: string
+          plan?: Database["public"]["Enums"]["subscription_plan"]
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          downloads_limit?: number
+          downloads_used?: number
+          id?: string
+          plan?: Database["public"]["Enums"]["subscription_plan"]
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_download_eligibility: {
+        Args: { p_file_id: string; p_user_id: string }
+        Returns: Json
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      record_download: {
+        Args: { p_file_id: string; p_user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
+      file_format: "PSD" | "PNG" | "JPG" | "SVG" | "AI" | "PDF" | "ZIP"
+      subscription_plan: "starter" | "pro" | "master"
+      subscription_status: "active" | "cancelled" | "expired" | "past_due"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +330,11 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+      file_format: ["PSD", "PNG", "JPG", "SVG", "AI", "PDF", "ZIP"],
+      subscription_plan: ["starter", "pro", "master"],
+      subscription_status: ["active", "cancelled", "expired", "past_due"],
+    },
   },
 } as const
