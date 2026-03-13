@@ -10,7 +10,7 @@ const plans = [
     icon: Zap,
     popular: false,
     features: [
-      "Até 20 downloads por mês",
+      "Até 10 downloads por mês",
       "Acesso a arquivos básicos",
       "Formatos PSD, PNG, JPG",
       "Suporte por email",
@@ -22,7 +22,7 @@ const plans = [
     icon: Sparkles,
     popular: true,
     features: [
-      "Até 100 downloads por mês",
+      "Até 17 downloads por mês",
       "Acesso à grande parte da biblioteca",
       "Todos os formatos disponíveis",
       "Novos arquivos semanais",
@@ -35,7 +35,7 @@ const plans = [
     icon: Crown,
     popular: false,
     features: [
-      "Downloads ilimitados",
+      "Até 27 downloads por mês",
       "Acesso total à biblioteca",
       "Todos os arquivos premium",
       "Atualizações semanais",
