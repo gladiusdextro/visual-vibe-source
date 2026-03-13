@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
         currency_id: "BRL",
       },
       payer_email: userEmail,
-      back_url: `${origin}/dashboard?payment=success`,
+      back_url: `${origin}/pagamento-sucesso`,
       external_reference: JSON.stringify({ user_id: userId, plan }),
       notification_url: webhookUrl,
       status: "pending",
