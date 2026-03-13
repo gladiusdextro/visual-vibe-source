@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
       return new Response("OK", { status: 200, headers: corsHeaders });
     }
 
-    // Handle legacy payment events (for backwards compatibility)
+    // Handle payment events (PIX one-time payments + legacy)
     if (body.type === "payment" || body.action === "payment.created" || body.action === "payment.updated") {
       const paymentId = body.data?.id;
       if (!paymentId) {
@@ -219,6 +219,7 @@ Deno.serve(async (req) => {
       const plan = payment.metadata?.plan;
 
       if (userId && plan) {
+        // Update payment record
         await supabase
           .from("payments")
           .update({
@@ -228,6 +229,45 @@ Deno.serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq("mercadopago_preference_id", payment.preference_id);
+
+        // If PIX payment approved, activate subscription (one-time, 30 days)
+        if (payment.status === "approved" && (payment.payment_type_id === "bank_transfer" || payment.payment_method_id === "pix")) {
+          const now = new Date();
+          const periodEnd = new Date(now);
+          periodEnd.setDate(periodEnd.getDate() + 30);
+
+          const { data: existingSub } = await supabase
+            .from("subscriptions")
+            .select("id")
+            .eq("user_id", userId)
+            .maybeSingle();
+
+          if (existingSub) {
+            await supabase
+              .from("subscriptions")
+              .update({
+                plan,
+                status: "active",
+                downloads_used: 0,
+                downloads_limit: PLAN_LIMITS[plan] || 10,
+                current_period_start: now.toISOString(),
+                current_period_end: periodEnd.toISOString(),
+                updated_at: now.toISOString(),
+              })
+              .eq("user_id", userId);
+          } else {
+            await supabase.from("subscriptions").insert({
+              user_id: userId,
+              plan,
+              status: "active",
+              downloads_used: 0,
+              downloads_limit: PLAN_LIMITS[plan] || 10,
+              current_period_start: now.toISOString(),
+              current_period_end: periodEnd.toISOString(),
+            });
+          }
+          console.log(`PIX subscription activated for user ${userId}, plan: ${plan}`);
+        }
       }
 
       return new Response("OK", { status: 200, headers: corsHeaders });

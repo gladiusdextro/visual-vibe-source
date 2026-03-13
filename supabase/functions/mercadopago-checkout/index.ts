@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     const userId = user.id;
     const userEmail = user.email;
 
-    const { plan } = await req.json();
+    const { plan, payment_type } = await req.json();
     const planConfig = PLAN_PRICES[plan];
     if (!planConfig) {
       return new Response(JSON.stringify({ error: "Plano inválido" }), {
@@ -63,7 +63,83 @@ Deno.serve(async (req) => {
     const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/mercadopago-webhook`;
     const origin = req.headers.get("origin") || "https://criahub.com";
 
-    // Create recurring subscription via Preapproval API
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // PIX: one-time payment via Checkout Preferences
+    if (payment_type === "pix") {
+      const preferenceBody = {
+        items: [
+          {
+            title: planConfig.title,
+            quantity: 1,
+            unit_price: planConfig.price,
+            currency_id: "BRL",
+          },
+        ],
+        payer: { email: userEmail },
+        payment_methods: {
+          excluded_payment_types: [
+            { id: "credit_card" },
+            { id: "debit_card" },
+            { id: "ticket" },
+          ],
+          installments: 1,
+        },
+        back_urls: {
+          success: `${origin}/pagamento-sucesso`,
+          failure: `${origin}/planos`,
+          pending: `${origin}/pagamento-sucesso`,
+        },
+        auto_return: "approved",
+        metadata: { user_id: userId, plan },
+        notification_url: webhookUrl,
+        external_reference: JSON.stringify({ user_id: userId, plan }),
+      };
+
+      const mpResponse = await fetch("https://api.mercadopago.com/checkout/preferences", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
+        },
+        body: JSON.stringify(preferenceBody),
+      });
+
+      if (!mpResponse.ok) {
+        const errorData = await mpResponse.text();
+        console.error("MP preference error:", errorData);
+        return new Response(JSON.stringify({ error: "Erro ao criar pagamento PIX" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const preference = await mpResponse.json();
+      console.log("PIX preference created:", preference.id);
+
+      await adminClient.from("payments").insert({
+        user_id: userId,
+        mercadopago_preference_id: preference.id,
+        amount: planConfig.price,
+        plan,
+        status: "pending",
+        payment_method: "pix",
+      });
+
+      return new Response(
+        JSON.stringify({
+          init_point: preference.init_point,
+          sandbox_init_point: preference.sandbox_init_point,
+          preference_id: preference.id,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // CARD: recurring subscription via Preapproval API
     const preapprovalBody = {
       reason: planConfig.title,
       auto_recurring: {
@@ -90,7 +166,7 @@ Deno.serve(async (req) => {
 
     if (!mpResponse.ok) {
       const errorData = await mpResponse.text();
-      console.error("Mercado Pago preapproval error:", errorData);
+      console.error("MP preapproval error:", errorData);
       return new Response(JSON.stringify({ error: "Erro ao criar assinatura" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -100,17 +176,11 @@ Deno.serve(async (req) => {
     const preapproval = await mpResponse.json();
     console.log("Preapproval created:", preapproval.id);
 
-    // Save preapproval reference in payments table
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
     await adminClient.from("payments").insert({
       user_id: userId,
       mercadopago_preference_id: preapproval.id,
       amount: planConfig.price,
-      plan: plan,
+      plan,
       status: "pending",
     });
 
