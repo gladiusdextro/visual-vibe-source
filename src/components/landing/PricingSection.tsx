@@ -22,7 +22,7 @@ const plans = [
     icon: Sparkles,
     popular: true,
     features: [
-      "Até 100 downloads por mês",
+      "Até 17 downloads por mês",
       "Acesso à grande parte da biblioteca",
       "Todos os formatos disponíveis",
       "Novos arquivos semanais",
