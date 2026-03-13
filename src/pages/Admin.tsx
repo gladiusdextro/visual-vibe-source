@@ -27,7 +27,9 @@ const plans = ["starter", "pro", "master"] as const;
 
 const Admin = () => {
   const [files, setFiles] = useState<any[]>([]);
-  const [stats, setStats] = useState({ totalFiles: 0, totalUsers: 0, totalDownloads: 0 });
+  const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [stats, setStats] = useState({ totalFiles: 0, totalUsers: 0, totalDownloads: 0, totalSubscribers: 0 });
   const [loading, setLoading] = useState(true);
   const [uploadOpen, setUploadOpen] = useState(false);
 
