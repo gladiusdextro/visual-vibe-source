@@ -35,7 +35,7 @@ const plans = [
     icon: Crown,
     popular: false,
     features: [
-      "Downloads ilimitados",
+      "Até 27 downloads por mês",
       "Acesso total à biblioteca",
       "Todos os arquivos premium",
       "Atualizações semanais",
