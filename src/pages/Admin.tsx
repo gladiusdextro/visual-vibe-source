@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Upload, Users, Download, FileText, Plus, Trash2, Eye, BarChart3,
-  Search, ChevronDown, X
+  Search, ChevronDown, X, CreditCard, Crown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -1,12 +1,17 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Sparkles, Zap, Crown } from "lucide-react";
+import { Check, Sparkles, Zap, Crown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 const plans = [
   {
     name: "Starter",
     price: "24,90",
+    id: "starter",
     icon: Zap,
     popular: false,
     features: [
@@ -18,7 +23,8 @@ const plans = [
   },
   {
     name: "Pro",
-    price: "39,90",
+    price: "34,90",
+    id: "pro",
     icon: Sparkles,
     popular: true,
     features: [
@@ -32,6 +38,7 @@ const plans = [
   {
     name: "Master",
     price: "59,90",
+    id: "master",
     icon: Crown,
     popular: false,
     features: [
@@ -46,6 +53,37 @@ const plans = [
 ];
 
 const PricingSection = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+
+  const handleSubscribe = async (planId: string) => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    setLoadingPlan(planId);
+    try {
+      const { data, error } = await supabase.functions.invoke("mercadopago-checkout", {
+        body: { plan: planId },
+      });
+
+      if (error) throw error;
+
+      if (data?.init_point) {
+        window.location.href = data.init_point;
+      } else {
+        throw new Error("URL de pagamento não gerada");
+      }
+    } catch (err: any) {
+      console.error("Checkout error:", err);
+      toast.error(err.message || "Erro ao iniciar pagamento. Tente novamente.");
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
+
   return (
     <section className="py-24 relative" id="planos">
       <div className="absolute inset-0 bg-gradient-hero opacity-50" />
@@ -108,17 +146,21 @@ const PricingSection = () => {
                 ))}
               </ul>
 
-              <Link to="/planos">
-                <Button
-                  className={`w-full ${
-                    plan.popular
-                      ? "bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow"
-                      : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                  }`}
-                >
-                  Assinar {plan.name}
-                </Button>
-              </Link>
+              <Button
+                onClick={() => handleSubscribe(plan.id)}
+                disabled={loadingPlan !== null}
+                className={`w-full ${
+                  plan.popular
+                    ? "bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow"
+                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                }`}
+              >
+                {loadingPlan === plan.id ? (
+                  <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Processando...</>
+                ) : (
+                  `Assinar ${plan.name}`
+                )}
+              </Button>
             </motion.div>
           ))}
         </div>
