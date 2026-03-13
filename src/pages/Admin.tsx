@@ -219,7 +219,7 @@ const Admin = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
               <div className="rounded-xl border border-border bg-gradient-card p-5 flex items-center gap-4">
                 <div className="p-3 rounded-lg bg-primary/10"><FileText className="w-5 h-5 text-primary" /></div>
                 <div>
@@ -239,6 +239,13 @@ const Admin = () => {
                 <div>
                   <p className="text-2xl font-bold font-display">{stats.totalDownloads}</p>
                   <p className="text-xs text-muted-foreground">Downloads</p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-gradient-card p-5 flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-primary/10"><Crown className="w-5 h-5 text-primary" /></div>
+                <div>
+                  <p className="text-2xl font-bold font-display">{stats.totalSubscribers}</p>
+                  <p className="text-xs text-muted-foreground">Assinantes ativos</p>
                 </div>
               </div>
             </div>
