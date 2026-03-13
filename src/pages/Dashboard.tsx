@@ -155,7 +155,59 @@ const Dashboard = () => {
                         <Link to="/planos">
                           <Button size="sm" variant="outline">Upgrade</Button>
                         </Link>
+                        {subscription.status === "active" && !showCancelConfirm && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setShowCancelConfirm(true)}
+                          >
+                            <XCircle className="w-4 h-4 mr-1" /> Cancelar
+                          </Button>
+                        )}
                       </div>
+                      {showCancelConfirm && (
+                        <div className="mt-3 p-3 rounded-lg border border-destructive/30 bg-destructive/5">
+                          <p className="text-sm text-foreground mb-3">
+                            Tem certeza que deseja cancelar sua assinatura? Você perderá o acesso ao final do período atual.
+                          </p>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={cancelling}
+                              onClick={async () => {
+                                setCancelling(true);
+                                try {
+                                  const { error } = await supabase.functions.invoke("mercadopago-cancel");
+                                  if (error) throw error;
+                                  toast.success("Assinatura cancelada com sucesso.");
+                                  setSubscription({ ...subscription, status: "cancelled" });
+                                  setShowCancelConfirm(false);
+                                } catch (err: any) {
+                                  toast.error(err.message || "Erro ao cancelar. Tente novamente.");
+                                } finally {
+                                  setCancelling(false);
+                                }
+                              }}
+                            >
+                              {cancelling ? (
+                                <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Cancelando...</>
+                              ) : (
+                                "Confirmar cancelamento"
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setShowCancelConfirm(false)}
+                              disabled={cancelling}
+                            >
+                              Voltar
+                            </Button>
+                          </div>
+                        </div>
+                      )
                     </div>
                   ) : (
                     <div className="text-center py-4">
