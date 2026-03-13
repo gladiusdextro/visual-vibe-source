@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Download, Crown, Clock, FileText, LogOut, Settings } from "lucide-react";
+import { Download, Crown, Clock, FileText, LogOut, Settings, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
+import { toast } from "sonner";
 
 interface Subscription {
   plan: string;
