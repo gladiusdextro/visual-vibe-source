@@ -207,7 +207,7 @@ const Dashboard = () => {
                             </Button>
                           </div>
                         </div>
-                      )
+                      )}
                     </div>
                   ) : (
                     <div className="text-center py-4">
