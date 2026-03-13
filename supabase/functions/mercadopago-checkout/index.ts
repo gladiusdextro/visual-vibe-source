@@ -32,17 +32,16 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userId = claimsData.claims.sub;
-    const userEmail = claimsData.claims.email;
+    const userId = user.id;
+    const userEmail = user.email;
 
     const { plan } = await req.json();
     const planConfig = PLAN_PRICES[plan];
@@ -61,63 +60,47 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get the project URL for callbacks
-    const projectId = Deno.env.get("SUPABASE_URL")!.match(/https:\/\/(.+)\.supabase\.co/)?.[1];
     const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/mercadopago-webhook`;
+    const origin = req.headers.get("origin") || "https://criahub.com";
 
-    // Create Mercado Pago preference
-    const preferenceBody = {
-      items: [
-        {
-          id: plan,
-          title: planConfig.title,
-          description: `Assinatura mensal - ${planConfig.downloads} downloads/mês`,
-          quantity: 1,
-          currency_id: "BRL",
-          unit_price: planConfig.price,
-        },
-      ],
-      payer: {
-        email: userEmail,
+    // Create recurring subscription via Preapproval API
+    const preapprovalBody = {
+      reason: planConfig.title,
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: "months",
+        transaction_amount: planConfig.price,
+        currency_id: "BRL",
       },
-      back_urls: {
-        success: `${req.headers.get("origin") || "https://criahub.com"}/dashboard?payment=success`,
-        failure: `${req.headers.get("origin") || "https://criahub.com"}/planos?payment=failure`,
-        pending: `${req.headers.get("origin") || "https://criahub.com"}/dashboard?payment=pending`,
-      },
-      auto_return: "approved",
+      payer_email: userEmail,
+      back_url: `${origin}/dashboard?payment=success`,
+      external_reference: JSON.stringify({ user_id: userId, plan }),
       notification_url: webhookUrl,
-      metadata: {
-        user_id: userId,
-        plan: plan,
-      },
-      payment_methods: {
-        excluded_payment_types: [],
-        installments: 1,
-      },
+      status: "pending",
     };
 
-    const mpResponse = await fetch("https://api.mercadopago.com/checkout/preferences", {
+    const mpResponse = await fetch("https://api.mercadopago.com/preapproval", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
       },
-      body: JSON.stringify(preferenceBody),
+      body: JSON.stringify(preapprovalBody),
     });
 
     if (!mpResponse.ok) {
       const errorData = await mpResponse.text();
-      console.error("Mercado Pago error:", errorData);
-      return new Response(JSON.stringify({ error: "Erro ao criar pagamento" }), {
+      console.error("Mercado Pago preapproval error:", errorData);
+      return new Response(JSON.stringify({ error: "Erro ao criar assinatura" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const preference = await mpResponse.json();
+    const preapproval = await mpResponse.json();
+    console.log("Preapproval created:", preapproval.id);
 
-    // Save payment record as pending
+    // Save preapproval reference in payments table
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -125,7 +108,7 @@ Deno.serve(async (req) => {
 
     await adminClient.from("payments").insert({
       user_id: userId,
-      mercadopago_preference_id: preference.id,
+      mercadopago_preference_id: preapproval.id,
       amount: planConfig.price,
       plan: plan,
       status: "pending",
@@ -133,9 +116,9 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        init_point: preference.init_point,
-        sandbox_init_point: preference.sandbox_init_point,
-        preference_id: preference.id,
+        init_point: preapproval.init_point,
+        sandbox_init_point: preapproval.sandbox_init_point,
+        preference_id: preapproval.id,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
