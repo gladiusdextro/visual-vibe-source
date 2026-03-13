@@ -1,8 +1,9 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { Menu, X, Download, Sparkles } from "lucide-react";
+import { Menu, X, Download, Sparkles, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/hooks/useAuth";
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -14,6 +15,13 @@ const navLinks = [
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass">
@@ -42,23 +50,36 @@ const Navbar = () => {
         </div>
 
         <div className="hidden md:flex items-center gap-3">
-          <Link to="/login">
-            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-              Entrar
-            </Button>
-          </Link>
-          <Link to="/planos">
-            <Button size="sm" className="bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow">
-              <Sparkles className="w-4 h-4 mr-1" />
-              Assinar
-            </Button>
-          </Link>
+          {user ? (
+            <>
+              <Link to="/dashboard">
+                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                  <User className="w-4 h-4 mr-1" />
+                  Minha Conta
+                </Button>
+              </Link>
+              <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-muted-foreground hover:text-foreground">
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link to="/login">
+                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                  Entrar
+                </Button>
+              </Link>
+              <Link to="/planos">
+                <Button size="sm" className="bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow">
+                  <Sparkles className="w-4 h-4 mr-1" />
+                  Assinar
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
 
-        <button
-          className="md:hidden text-foreground"
-          onClick={() => setMobileOpen(!mobileOpen)}
-        >
+        <button className="md:hidden text-foreground" onClick={() => setMobileOpen(!mobileOpen)}>
           {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
       </div>
@@ -85,12 +106,25 @@ const Navbar = () => {
                 </Link>
               ))}
               <div className="flex gap-2 pt-2">
-                <Link to="/login" className="flex-1">
-                  <Button variant="outline" size="sm" className="w-full">Entrar</Button>
-                </Link>
-                <Link to="/planos" className="flex-1">
-                  <Button size="sm" className="w-full bg-gradient-primary text-primary-foreground">Assinar</Button>
-                </Link>
+                {user ? (
+                  <>
+                    <Link to="/dashboard" className="flex-1" onClick={() => setMobileOpen(false)}>
+                      <Button variant="outline" size="sm" className="w-full">Minha Conta</Button>
+                    </Link>
+                    <Button variant="ghost" size="sm" onClick={() => { handleSignOut(); setMobileOpen(false); }}>
+                      <LogOut className="w-4 h-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/login" className="flex-1" onClick={() => setMobileOpen(false)}>
+                      <Button variant="outline" size="sm" className="w-full">Entrar</Button>
+                    </Link>
+                    <Link to="/planos" className="flex-1" onClick={() => setMobileOpen(false)}>
+                      <Button size="sm" className="w-full bg-gradient-primary text-primary-foreground">Assinar</Button>
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>
