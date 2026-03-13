@@ -41,6 +41,10 @@ const App = () => (
               element={<ProtectedRoute><Dashboard /></ProtectedRoute>}
             />
             <Route
+              path="/pagamento-sucesso"
+              element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>}
+            />
+            <Route
               path="/admin"
               element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>}
             />
