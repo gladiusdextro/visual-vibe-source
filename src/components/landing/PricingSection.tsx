@@ -10,7 +10,7 @@ const plans = [
     icon: Zap,
     popular: false,
     features: [
-      "Até 20 downloads por mês",
+      "Até 10 downloads por mês",
       "Acesso a arquivos básicos",
       "Formatos PSD, PNG, JPG",
       "Suporte por email",
