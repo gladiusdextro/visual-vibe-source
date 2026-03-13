@@ -49,16 +49,21 @@ const Admin = () => {
   }, []);
 
   const fetchData = async () => {
-    const [filesRes, profilesRes, downloadsRes] = await Promise.all([
+    const [filesRes, profilesRes, downloadsRes, subsRes, paymentsRes] = await Promise.all([
       supabase.from("creative_files").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("id", { count: "exact", head: true }),
       supabase.from("download_history").select("id", { count: "exact", head: true }),
+      supabase.from("subscriptions").select("*, profiles(full_name)").order("created_at", { ascending: false }),
+      supabase.from("payments").select("*, profiles(full_name)").order("created_at", { ascending: false }).limit(50),
     ]);
     if (filesRes.data) setFiles(filesRes.data);
+    if (subsRes.data) setSubscribers(subsRes.data);
+    if (paymentsRes.data) setPayments(paymentsRes.data);
     setStats({
       totalFiles: filesRes.data?.length ?? 0,
       totalUsers: profilesRes.count ?? 0,
       totalDownloads: downloadsRes.count ?? 0,
+      totalSubscribers: subsRes.data?.filter((s: any) => s.status === "active").length ?? 0,
     });
     setLoading(false);
   };
