@@ -1,18 +1,8 @@
-import { useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Sparkles, Zap, Crown, Loader2, CreditCard, QrCode } from "lucide-react";
+import { Check, Sparkles, Zap, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 
 const plans = [
   {
@@ -62,44 +52,14 @@ const plans = [
 const PricingSection = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [loadingType, setLoadingType] = useState<string | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
 
   const handleSelectPlan = (planId: string) => {
     if (!user) {
       navigate("/login");
       return;
     }
-    setSelectedPlan(planId);
-    setDialogOpen(true);
+    navigate(`/checkout?plan=${planId}`);
   };
-
-  const handleCheckout = async (paymentType: "card" | "pix") => {
-    if (!selectedPlan) return;
-
-    setLoadingType(paymentType);
-    try {
-      const { data, error } = await supabase.functions.invoke("mercadopago-checkout", {
-        body: { plan: selectedPlan, payment_type: paymentType },
-      });
-
-      if (error) throw error;
-
-      if (data?.init_point) {
-        window.location.href = data.init_point;
-      } else {
-        throw new Error("URL de pagamento não gerada");
-      }
-    } catch (err: any) {
-      console.error("Checkout error:", err);
-      toast.error(err.message || "Erro ao iniciar pagamento. Tente novamente.");
-    } finally {
-      setLoadingType(null);
-    }
-  };
-
-  const selectedPlanData = plans.find((p) => p.id === selectedPlan);
 
   return (
     <section className="py-24 relative" id="planos">
@@ -165,7 +125,6 @@ const PricingSection = () => {
 
               <Button
                 onClick={() => handleSelectPlan(plan.id)}
-                disabled={loadingType !== null}
                 className={`w-full ${
                   plan.popular
                     ? "bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow"
@@ -178,55 +137,6 @@ const PricingSection = () => {
           ))}
         </div>
       </div>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Como deseja pagar?</DialogTitle>
-            <DialogDescription>
-              {selectedPlanData && (
-                <>Plano <strong>{selectedPlanData.name}</strong> — R$ {selectedPlanData.price}/mês</>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid gap-3 mt-4">
-            <Button
-              variant="outline"
-              className="w-full h-auto py-4 flex items-center gap-4 justify-start border-border hover:border-primary hover:bg-primary/5"
-              onClick={() => handleCheckout("card")}
-              disabled={loadingType !== null}
-            >
-              {loadingType === "card" ? (
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              ) : (
-                <CreditCard className="w-6 h-6 text-primary" />
-              )}
-              <div className="text-left">
-                <p className="font-semibold text-foreground">Cartão de Crédito</p>
-                <p className="text-xs text-muted-foreground">Cobrança automática mensal</p>
-              </div>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="w-full h-auto py-4 flex items-center gap-4 justify-start border-border hover:border-primary hover:bg-primary/5"
-              onClick={() => handleCheckout("pix")}
-              disabled={loadingType !== null}
-            >
-              {loadingType === "pix" ? (
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              ) : (
-                <QrCode className="w-6 h-6 text-primary" />
-              )}
-              <div className="text-left">
-                <p className="font-semibold text-foreground">PIX</p>
-                <p className="text-xs text-muted-foreground">Pagamento único (sem renovação automática)</p>
-              </div>
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </section>
   );
 };

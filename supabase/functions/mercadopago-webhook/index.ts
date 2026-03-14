@@ -230,8 +230,8 @@ Deno.serve(async (req) => {
           })
           .eq("mercadopago_preference_id", payment.preference_id);
 
-        // If PIX payment approved, activate subscription (one-time, 30 days)
-        if (payment.status === "approved" && (payment.payment_type_id === "bank_transfer" || payment.payment_method_id === "pix")) {
+        // If payment approved, activate subscription (30 days)
+        if (payment.status === "approved") {
           const now = new Date();
           const periodEnd = new Date(now);
           periodEnd.setDate(periodEnd.getDate() + 30);
