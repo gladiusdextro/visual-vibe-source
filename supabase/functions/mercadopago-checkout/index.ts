@@ -12,6 +12,12 @@ const PLAN_PRICES: Record<string, { title: string; price: number; downloads: num
   master: { title: "CriaHub Master", price: 59.9, downloads: 27 },
 };
 
+const PLAN_LIMITS: Record<string, number> = {
+  starter: 10,
+  pro: 17,
+  master: 27,
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -40,10 +46,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const userId = user.id;
-    const userEmail = user.email;
-
-    const { plan, payment_type } = await req.json();
+    const body = await req.json();
+    const { plan, payment_type } = body;
     const planConfig = PLAN_PRICES[plan];
     if (!planConfig) {
       return new Response(JSON.stringify({ error: "Plano inválido" }), {
@@ -61,137 +65,172 @@ Deno.serve(async (req) => {
     }
 
     const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/mercadopago-webhook`;
-    const origin = req.headers.get("origin") || "https://criahub.com";
-
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // PIX: one-time payment via Checkout Preferences
+    // ── PIX (Transparent Checkout) ──
     if (payment_type === "pix") {
-      const preferenceBody = {
-        items: [
-          {
-            title: planConfig.title,
-            quantity: 1,
-            unit_price: planConfig.price,
-            currency_id: "BRL",
-          },
-        ],
-        payer: { email: userEmail },
-        payment_methods: {
-          excluded_payment_types: [
-            { id: "credit_card" },
-            { id: "debit_card" },
-            { id: "ticket" },
-          ],
-          installments: 1,
-        },
-        back_urls: {
-          success: `${origin}/pagamento-sucesso`,
-          failure: `${origin}/planos`,
-          pending: `${origin}/pagamento-sucesso`,
-        },
-        auto_return: "approved",
-        metadata: { user_id: userId, plan },
+      const paymentBody = {
+        transaction_amount: planConfig.price,
+        description: planConfig.title,
+        payment_method_id: "pix",
+        payer: { email: user.email },
+        metadata: { user_id: user.id, plan },
         notification_url: webhookUrl,
-        external_reference: JSON.stringify({ user_id: userId, plan }),
       };
 
-      const mpResponse = await fetch("https://api.mercadopago.com/checkout/preferences", {
+      const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
+          "X-Idempotency-Key": `${user.id}-${plan}-pix-${Date.now()}`,
         },
-        body: JSON.stringify(preferenceBody),
+        body: JSON.stringify(paymentBody),
       });
 
       if (!mpResponse.ok) {
         const errorData = await mpResponse.text();
-        console.error("MP preference error:", errorData);
+        console.error("MP PIX error:", errorData);
         return new Response(JSON.stringify({ error: "Erro ao criar pagamento PIX" }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const preference = await mpResponse.json();
-      console.log("PIX preference created:", preference.id);
+      const payment = await mpResponse.json();
+      console.log("PIX payment created:", payment.id, payment.status);
 
       await adminClient.from("payments").insert({
-        user_id: userId,
-        mercadopago_preference_id: preference.id,
+        user_id: user.id,
+        mercadopago_payment_id: String(payment.id),
         amount: planConfig.price,
         plan,
-        status: "pending",
+        status: payment.status,
         payment_method: "pix",
       });
 
       return new Response(
         JSON.stringify({
-          init_point: preference.init_point,
-          sandbox_init_point: preference.sandbox_init_point,
-          preference_id: preference.id,
+          payment_id: payment.id,
+          status: payment.status,
+          qr_code: payment.point_of_interaction?.transaction_data?.qr_code,
+          qr_code_base64: payment.point_of_interaction?.transaction_data?.qr_code_base64,
+          ticket_url: payment.point_of_interaction?.transaction_data?.ticket_url,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // CARD: recurring subscription via Preapproval API
-    const preapprovalBody = {
-      reason: planConfig.title,
-      auto_recurring: {
-        frequency: 1,
-        frequency_type: "months",
+    // ── CARD (Transparent Checkout) ──
+    if (payment_type === "card") {
+      const { token, installments, issuer_id, payment_method_id, payer } = body;
+
+      if (!token) {
+        return new Response(JSON.stringify({ error: "Token do cartão é obrigatório" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const paymentBody = {
         transaction_amount: planConfig.price,
-        currency_id: "BRL",
-      },
-      payer_email: userEmail,
-      back_url: `${origin}/pagamento-sucesso`,
-      external_reference: JSON.stringify({ user_id: userId, plan }),
-      notification_url: webhookUrl,
-      status: "pending",
-    };
+        token,
+        description: planConfig.title,
+        installments: installments || 1,
+        payment_method_id,
+        issuer_id,
+        payer: {
+          email: user.email,
+          identification: payer?.identification,
+        },
+        metadata: { user_id: user.id, plan },
+        notification_url: webhookUrl,
+      };
 
-    const mpResponse = await fetch("https://api.mercadopago.com/preapproval", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
-      },
-      body: JSON.stringify(preapprovalBody),
-    });
-
-    if (!mpResponse.ok) {
-      const errorData = await mpResponse.text();
-      console.error("MP preapproval error:", errorData);
-      return new Response(JSON.stringify({ error: "Erro ao criar assinatura" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
+          "X-Idempotency-Key": `${user.id}-${plan}-card-${Date.now()}`,
+        },
+        body: JSON.stringify(paymentBody),
       });
+
+      if (!mpResponse.ok) {
+        const errorData = await mpResponse.text();
+        console.error("MP card error:", errorData);
+        return new Response(JSON.stringify({ error: "Erro ao processar pagamento com cartão" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const payment = await mpResponse.json();
+      console.log("Card payment created:", payment.id, payment.status);
+
+      await adminClient.from("payments").insert({
+        user_id: user.id,
+        mercadopago_payment_id: String(payment.id),
+        amount: planConfig.price,
+        plan,
+        status: payment.status,
+        payment_method: payment.payment_method_id || "card",
+      });
+
+      // If approved immediately, activate subscription
+      if (payment.status === "approved") {
+        const now = new Date();
+        const periodEnd = new Date(now);
+        periodEnd.setDate(periodEnd.getDate() + 30);
+
+        const { data: existingSub } = await adminClient
+          .from("subscriptions")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (existingSub) {
+          await adminClient.from("subscriptions").update({
+            plan,
+            status: "active",
+            downloads_used: 0,
+            downloads_limit: PLAN_LIMITS[plan] || 10,
+            current_period_start: now.toISOString(),
+            current_period_end: periodEnd.toISOString(),
+            updated_at: now.toISOString(),
+          }).eq("user_id", user.id);
+        } else {
+          await adminClient.from("subscriptions").insert({
+            user_id: user.id,
+            plan,
+            status: "active",
+            downloads_used: 0,
+            downloads_limit: PLAN_LIMITS[plan] || 10,
+            current_period_start: now.toISOString(),
+            current_period_end: periodEnd.toISOString(),
+          });
+        }
+        console.log(`Card subscription activated for ${user.id}, plan: ${plan}`);
+      }
+
+      return new Response(
+        JSON.stringify({
+          payment_id: payment.id,
+          status: payment.status,
+          status_detail: payment.status_detail,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const preapproval = await mpResponse.json();
-    console.log("Preapproval created:", preapproval.id);
-
-    await adminClient.from("payments").insert({
-      user_id: userId,
-      mercadopago_preference_id: preapproval.id,
-      amount: planConfig.price,
-      plan,
-      status: "pending",
+    return new Response(JSON.stringify({ error: "Tipo de pagamento inválido" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
-    return new Response(
-      JSON.stringify({
-        init_point: preapproval.init_point,
-        sandbox_init_point: preapproval.sandbox_init_point,
-        preference_id: preapproval.id,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
   } catch (error) {
     console.error("Checkout error:", error);
     return new Response(JSON.stringify({ error: "Erro interno" }), {
