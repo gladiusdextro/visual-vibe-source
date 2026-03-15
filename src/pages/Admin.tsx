@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Upload, Users, Download, FileText, Plus, Trash2, Eye, BarChart3,
-  Search, ChevronDown, X, CreditCard, Crown, Database
+  Search, ChevronDown, X, CreditCard, Crown, Database, Code2
 } from "lucide-react";
 import ExportDataPanel from "@/components/admin/ExportDataPanel";
+import SchemaPanel from "@/components/admin/SchemaPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -257,6 +258,7 @@ const Admin = () => {
                 <TabsTrigger value="subscribers">Assinantes</TabsTrigger>
                 <TabsTrigger value="payments">Pagamentos</TabsTrigger>
                 <TabsTrigger value="export"><Database className="w-4 h-4 mr-1" />Exportar</TabsTrigger>
+                <TabsTrigger value="schema"><Code2 className="w-4 h-4 mr-1" />Schema SQL</TabsTrigger>
               </TabsList>
 
               <TabsContent value="files">
@@ -407,6 +409,10 @@ const Admin = () => {
 
               <TabsContent value="export">
                 <ExportDataPanel />
+              </TabsContent>
+
+              <TabsContent value="schema">
+                <SchemaPanel />
               </TabsContent>
             </Tabs>
           </motion.div>
