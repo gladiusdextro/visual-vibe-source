@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Upload, Users, Download, FileText, Plus, Trash2, Eye, BarChart3,
-  Search, ChevronDown, X, CreditCard, Crown
+  Search, ChevronDown, X, CreditCard, Crown, Database
 } from "lucide-react";
+import ExportDataPanel from "@/components/admin/ExportDataPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
