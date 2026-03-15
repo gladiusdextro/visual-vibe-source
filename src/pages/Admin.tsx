@@ -404,6 +404,10 @@ const Admin = () => {
                   )}
                 </div>
               </TabsContent>
+
+              <TabsContent value="export">
+                <ExportDataPanel />
+              </TabsContent>
             </Tabs>
           </motion.div>
         </div>
