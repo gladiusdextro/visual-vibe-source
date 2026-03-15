@@ -73,7 +73,19 @@ const ExportDataPanel = () => {
       }
 
       if (allData.length === 0) {
-        toast.info(`Nenhum dado encontrado em "${item.label}".`);
+        const columnMap: Record<string, string[]> = {
+          creative_files: ["id","title","description","category","format","file_path","thumbnail_path","plan_required","is_active","downloads_count","file_size_bytes","tags","created_at","updated_at"],
+          profiles: ["id","full_name","avatar_url","created_at","updated_at"],
+          subscriptions: ["id","user_id","plan","status","current_period_start","current_period_end","downloads_limit","downloads_used","mercadopago_subscription_id","stripe_subscription_id","created_at","updated_at"],
+          payments: ["id","user_id","plan","amount","currency","status","payment_method","mercadopago_payment_id","mercadopago_preference_id","subscription_id","created_at","updated_at"],
+          download_history: ["id","user_id","file_id","downloaded_at"],
+          user_roles: ["id","user_id","role"],
+        };
+        const headers = columnMap[item.table] || [];
+        const csv = headers.join(",");
+        downloadCSV(csv, item.key);
+        setExportedKeys((prev) => new Set(prev).add(item.key));
+        toast.info(`Nenhum registro em "${item.label}", exportado apenas os cabeçalhos.`);
         setLoadingKey(null);
         return;
       }
