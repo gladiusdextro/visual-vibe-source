@@ -258,6 +258,7 @@ const Admin = () => {
                 <TabsTrigger value="subscribers">Assinantes</TabsTrigger>
                 <TabsTrigger value="payments">Pagamentos</TabsTrigger>
                 <TabsTrigger value="export"><Database className="w-4 h-4 mr-1" />Exportar</TabsTrigger>
+                <TabsTrigger value="schema"><Code2 className="w-4 h-4 mr-1" />Schema SQL</TabsTrigger>
               </TabsList>
 
               <TabsContent value="files">
